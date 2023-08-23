@@ -53,7 +53,7 @@ class LoRaDeviceSearchScreenState extends State<LoRaDeviceSearchScreen>
       for (var result in results) {
         setState(
           () {
-            if (result.length > 1) peers.add(result.split("_")[0]);
+            if (result.length > 1) peers.add(result.split("-")[0]);
           },
         );
         print(result);
