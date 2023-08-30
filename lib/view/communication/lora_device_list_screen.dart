@@ -62,7 +62,7 @@ class _LoRaDeviceListScreen extends State<LoRaDeviceListScreen> {
                           ),
                         )
                       : Text(
-                          widget.devices[index],
+                          widget.devices[index].split("-")[0],
                           style: const TextStyle(
                             fontFamily: 'Fredoka',
                             fontSize: 16,

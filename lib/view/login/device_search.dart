@@ -4,15 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:lo_n_t_ra/controller/BT/bluetooth_controller.dart';
 import 'package:lo_n_t_ra/view/login/device_list_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DeviceSearchScreen extends StatefulWidget {
   const DeviceSearchScreen({super.key});
 
   @override
-  _DeviceSearchScreenState createState() => _DeviceSearchScreenState();
+  DeviceSearchScreenState createState() => DeviceSearchScreenState();
 }
 
-class _DeviceSearchScreenState extends State<DeviceSearchScreen>
+class DeviceSearchScreenState extends State<DeviceSearchScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _controller;
   final BluetoothController _bluetoothController = BluetoothController();
@@ -21,9 +22,16 @@ class _DeviceSearchScreenState extends State<DeviceSearchScreen>
   bool _isBTOn = false;
   Timer? _bluetoothPollingTimer;
 
+  Future<void> _clearSharedPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.clear();
+  }
+
   @override
   void initState() {
     super.initState();
+    _clearSharedPreferences();
+
     _controller = AnimationController(
       duration: const Duration(seconds: 3),
       vsync: this,
@@ -46,26 +54,24 @@ class _DeviceSearchScreenState extends State<DeviceSearchScreen>
       });
       if (value) _startSearch();
     });
-    _bluetoothPollingTimer =
-        Timer.periodic(const Duration(seconds: 10), (timer) {
-      _checkBluetoothState();
-    });
+    // _bluetoothPollingTimer =
+    //     Timer.periodic(const Duration(seconds: 10), (timer) {
+    //   _checkBluetoothState();
+    // });
   }
 
   void _checkBluetoothState() async {
     bool isOn = await _bluetoothController.isBTOn();
+    if (!isOn) {
+      await _bluetoothController.turnOn();
+      isOn = await _bluetoothController.isBTOn();
+    }
     setState(() {
       _isBTOn = isOn;
     });
-    if (!isOn) {
-      _controller.reset();
-      _controller.stop();
-      _isSearching = false;
-      _bluetoothController.turnOn().then((value) {
-        _bluetoothController
-            .isBTOn()
-            .then((value) => value ? _startSearch : null);
-      });
+
+    if (isOn) {
+      _startSearch();
     }
   }
 
@@ -122,7 +128,10 @@ class _DeviceSearchScreenState extends State<DeviceSearchScreen>
   Widget build(BuildContext context) {
     return Scaffold(
         floatingActionButton: FloatingActionButton.extended(
-          onPressed: _isBTOn ? _startSearch : _bluetoothController.turnOn,
+          onPressed: () {
+            _checkBluetoothState();
+            _isBTOn ? _startSearch : _bluetoothController.turnOn;
+          },
           backgroundColor: Colors.green,
           label: _isBTOn
               ? const Text(

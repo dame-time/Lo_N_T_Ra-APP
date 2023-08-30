@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:lo_n_t_ra/controller/BT/bluetooth_controller.dart';
+import 'package:lo_n_t_ra/model/message_manager.dart';
 import 'package:lo_n_t_ra/view/communication/lora_device_list_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoRaDeviceSearchScreen extends StatefulWidget {
   final BluetoothController bluetoothController;
@@ -30,6 +32,7 @@ class LoRaDeviceSearchScreenState extends State<LoRaDeviceSearchScreen>
       duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat();
+    MessageManager().startListeningForDevice(widget.device);
 
     WidgetsBinding.instance.addObserver(this);
     startSearch();
@@ -45,18 +48,14 @@ class LoRaDeviceSearchScreenState extends State<LoRaDeviceSearchScreen>
     _controller.reset();
 
     if (responseMessage.isNotEmpty) {
-      // Redirect to another screen if the response is not empty
-      print(responseMessage);
-
       List<String> peers = [];
       var results = responseMessage.split(";");
       for (var result in results) {
         setState(
           () {
-            if (result.length > 1) peers.add(result.split("-")[0]);
+            if (result.length > 1) peers.add(result);
           },
         );
-        print(result);
       }
 
       Navigator.push(
@@ -72,8 +71,13 @@ class LoRaDeviceSearchScreenState extends State<LoRaDeviceSearchScreen>
     }
   }
 
+  Future<void> _clearSharedPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.clear();
+  }
+
   // TODO: Call that on dispose or when the app gets closed also on the password screen do the same thing
-  void disconnectDevice() async {
+  Future<bool> disconnectDevice() async {
     const String serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
     const String characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
@@ -93,6 +97,10 @@ class LoRaDeviceSearchScreenState extends State<LoRaDeviceSearchScreen>
 
     await characteristic.write(message, timeout: 30);
     await widget.device.disconnect();
+
+    MessageManager().stopListeningForDevice(widget.device);
+
+    return true;
   }
 
   Future<String> showConnectedPeers() async {
@@ -118,6 +126,12 @@ class LoRaDeviceSearchScreenState extends State<LoRaDeviceSearchScreen>
     String responseMessage = utf8.decode(response);
 
     return responseMessage;
+  }
+
+  @override
+  void dispose() {
+    _clearSharedPreferences();
+    super.dispose();
   }
 
   @override
@@ -157,11 +171,12 @@ class LoRaDeviceSearchScreenState extends State<LoRaDeviceSearchScreen>
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () {
-                  disconnectDevice();
-                  int count = 0;
-                  Navigator.popUntil(context, (route) {
-                    return count++ ==
-                        3; // Pop 3 times to go back to the previous previous previous screen
+                  disconnectDevice().then((_) {
+                    int count = 0;
+                    Navigator.popUntil(context, (route) {
+                      return count++ ==
+                          3; // Pop 3 times to go back to the previous previous previous screen
+                    });
                   });
                 },
               ),
